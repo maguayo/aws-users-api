@@ -1,0 +1,33 @@
+name: Deploy master
+on:
+  push:
+    branches:
+      - main
+jobs:
+  deploy-master:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions/setup-node@v1
+        with:
+          node-version: "10.x"
+
+      - name: Install Serverless Framework
+        run: npm install -g serverless
+
+      - name: Create env file
+        run: |
+          touch .env
+          echo MAILGUN_API_KEY=${{secrets.MAILGUN_API_KEY}} >> .env
+          echo MAILGUN_BASE_URL=${{secrets.MAILGUN_BASE_URL}} >> .env
+          echo SENTRY=${{secrets.SENTRY}} >> .env
+          echo JWT_SECRET=${{secrets.JWT_SECRET}} >> .env
+
+      - name: Serverless AWS authentication
+        run: sls config credentials --provider aws --key ${{ secrets.AWS_ACCESS_KEY_ID }} --secret ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Install NPM dependencies
+        run: npm install
+
+      - name: Deploy to eu-west-3
+        run: sls deploy --stage v1 --region eu-west-3

@@ -1,0 +1,79 @@
+service: aws-users-api
+
+package:
+  individually: true
+
+provider:
+  name: aws
+  runtime: python3.8
+  region: ${opt:region, "eu-west-3"}
+  stage: ${opt:stage, "dev"}
+  environment:
+    STAGE: ${opt:stage, "dev"}
+    USERS_TABLE: ${self:custom.stagingVars.${self:provider.stage}.usersTable}
+    REGION: ${self:provider.region}
+
+  deploymentBucket: serverless-${opt:region, 'eu-west-3'}-lambdas
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:DescribeTable
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:BatchWriteItem
+            - dynamodb:BatchGetItem
+          Resource: "*"
+
+plugins:
+  - serverless-python-requirements
+  - serverless-dotenv-plugin
+
+custom:
+  pythonRequirements:
+    dockerizePip: true
+    layer:
+      name: my-awesome-app-layer
+      description: My awesome app layer
+      compatibleRuntimes:
+        - python3.8
+  stagingVars:
+    v1:
+      usersTable: example-users
+    dev:
+      usersTable: example-users-dev
+
+functions:
+  app:
+    package:
+      include:
+        - "main.py"
+        - "src/**"
+      exclude:
+        - "requirements.txt"
+        - "package.json"
+        - "package-lock.json"
+        - ".serverless/**"
+        - ".virtualenv/**"
+        - "node_modules/**"
+        - "env/**"
+        - "__pycache__/**"
+        - "tests/**"
+        - "venv/**"
+
+    handler: src.main.handler
+    environment:
+      STAGE: ${opt:stage, "dev"}
+      REGION: ${self:provider.region}
+      USERS_TABLE: ${self:custom.stagingVars.${self:provider.stage}.usersTable}
+    layers:
+      - { Ref: PythonRequirementsLambdaLayer }
+    events:
+      - http:
+          method: any
+          path: /{proxy+}
